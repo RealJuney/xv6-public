@@ -52,6 +52,29 @@ fdalloc(struct file *f)
   return -1;
 }
 
+// for custom getreadcount syscall
+static struct spinlock rc_lock;
+static int read_count;
+
+// increment read count
+static void
+inc_rc(void)
+{
+  acquire(&rc_lock);
+  read_count++;
+  release(&rc_lock);
+}
+
+static int
+get_rc(void)
+{
+  int ret = 0;
+  acquire(&rc_lock);
+  ret = read_count;
+  release(&rc_lock);
+  return ret;
+}
+
 int
 sys_dup(void)
 {
@@ -69,6 +92,9 @@ sys_dup(void)
 int
 sys_read(void)
 {
+  // increment read count
+  inc_rc();
+
   struct file *f;
   int n;
   char *p;
@@ -76,6 +102,12 @@ sys_read(void)
   if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0)
     return -1;
   return fileread(f, p, n);
+}
+
+int
+sys_getreadcount(void)
+{
+  return get_rc();
 }
 
 int
